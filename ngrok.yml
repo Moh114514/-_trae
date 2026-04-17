@@ -1,0 +1,15 @@
+version: "2"
+authtoken: ${NGROK_AUTHTOKEN}
+
+tunnels:
+  # 前端穿透
+  beims-frontend:
+    proto: http
+    addr: localhost:3000
+    inspect: true
+  
+  # 后端穿透
+  beims-backend:
+    proto: http
+    addr: localhost:8001
+    inspect: true

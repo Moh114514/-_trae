@@ -1,0 +1,8 @@
+Building_ID,Building_Type,Timestamp,Electricity_Consumption_kWh,Water_Consumption_m3,HVAC_Energy_kWh,CHW_Supply_Temp_C,CHW_Return_Temp_C,Outdoor_Temp_C,Relative_Humidity_Pct,Occupancy_Density_People_100qm,Meter_ID,System_Status
+B001,Office,2025/04/01 08:00,120.5,3.1,55,7.1,12.4,27,60,30,M001,Normal
+B001,Office,2025/04/01 09:00,135.2,3.4,62,7.0,12.8,28,63,35,M001,Normal
+B001,Office,2025/04/01 10:00,150.7,3.7,70,6.9,13.2,29,65,40,M001,Normal
+B002,Teaching,2025/04/01 08:00,200.4,4.5,85,7.3,12.6,26,58,50,M002,Normal
+B002,Teaching,2025/04/01 09:00,215.6,4.8,90,7.2,12.9,27,60,55,M002,Normal
+B003,Hospital,2025/04/01 08:00,310.8,6.2,120,7.0,13.0,25,55,70,M003,Normal
+B003,Hospital,2025/04/01 09:00,330.2,6.5,130,6.8,13.5,26,57,75,M003,Abnormal

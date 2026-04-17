@@ -1,0 +1,29 @@
+/* 为空气处理机组状态项添加自定义图标 */
+.status-item .status-icon .el-icon fan,
+.status-item .status-icon .el-icon .fan {
+  display: none !important;
+}
+
+.status-item:has(.status-name:contains("空气处理机组")) .status-icon,
+.status-item:has(.status-name:contains("AHU")) .status-icon,
+li.status-item:has(.status-name:contains("空气处理机组")) .status-icon,
+div.status-item:has(.status-name:contains("空气处理机组")) .status-icon {
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1024 1024'%3E%3Cpath fill='%2300d4ff' d='M192 192h640v640H192zM256 256v512h512V256z'/%3E%3Cpath fill='%2300d4ff' d='M320 320h384v96H320zm0 192h384v96H320z'/%3E%3C/svg%3E") center/contain no-repeat;
+  width: 24px;
+  height: 24px;
+}
+
+/* 为空气处理机组添加标记 */
+.status-item:has(.status-name:contains("空气处理机组"))::before {
+  content: "AHU";
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: linear-gradient(135deg, #00d4ff, #0066cc);
+  color: white;
+  font-size: 8px;
+  font-weight: bold;
+  padding: 2px 4px;
+  border-radius: 4px;
+  z-index: 10;
+}

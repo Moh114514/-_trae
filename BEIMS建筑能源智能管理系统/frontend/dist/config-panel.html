@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BEIMS 后端配置工具</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      width: 100%;
+      max-width: 600px;
+      padding: 40px;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .header h1 {
+      color: #333;
+      font-size: 28px;
+      margin-bottom: 8px;
+    }
+
+    .header p {
+      color: #666;
+      font-size: 14px;
+    }
+
+    .form-group {
+      margin-bottom: 24px;
+    }
+
+    .form-group label {
+      display: block;
+      color: #333;
+      font-weight: 600;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: all 0.3s ease;
+      font-family: 'Courier New', monospace;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .button-group {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    button {
+      flex: 1;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .btn-test {
+      background: linear-gradient(135deg, #00bfff 0%, #0080ff 100%);
+      color: white;
+    }
+
+    .btn-test:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px rgba(0, 128, 255, 0.3);
+    }
+
+    .btn-save {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .btn-save:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3);
+    }
+
+    .btn-reset {
+      background: #f0f0f0;
+      color: #666;
+    }
+
+    .btn-reset:hover {
+      background: #e0e0e0;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    .status-box {
+      background: #f5f7fa;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 24px;
+      border-left: 4px solid #e0e0e0;
+    }
+
+    .status-box.success {
+      border-left-color: #4caf50;
+      background: #f1f8f5;
+    }
+
+    .status-box.error {
+      border-left-color: #f44336;
+      background: #fef5f5;
+    }
+
+    .status-box.testing {
+      border-left-color: #ff9800;
+      background: #fff8f0;
+    }
+
+    .status-label {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .status-box.success .status-label {
+      color: #4caf50;
+    }
+
+    .status-box.error .status-label {
+      color: #f44336;
+    }
+
+    .status-box.testing .status-label {
+      color: #ff9800;
+    }
+
+    .status-content {
+      font-size: 14px;
+      color: #333;
+      word-break: break-all;
+      font-family: 'Courier New', monospace;
+    }
+
+    .status-box.success .status-content {
+      color: #2e7d32;
+    }
+
+    .status-box.error .status-content {
+      color: #c62828;
+    }
+
+    .info-box {
+      background: #e3f2fd;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 24px;
+      border-left: 4px solid #2196f3;
+      font-size: 13px;
+      color: #1565c0;
+      line-height: 1.6;
+    }
+
+    .current-config {
+      background: #f9f9f9;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 24px;
+      border: 1px solid #e0e0e0;
+    }
+
+    .current-config-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #999;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .current-config-url {
+      font-size: 14px;
+      color: #333;
+      word-break: break-all;
+      font-family: 'Courier New', monospace;
+      background: #fff;
+      padding: 8px 12px;
+      border-radius: 4px;
+      border: 1px solid #e0e0e0;
+      min-height: 24px;
+    }
+
+    .loading-spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid #ff9800;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .quick-buttons {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+
+    .quick-btn {
+      flex: 1;
+      min-width: 120px;
+      padding: 8px 12px;
+      background: #f0f0f0;
+      color: #666;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .quick-btn:hover {
+      background: #e0e0e0;
+      border-color: #999;
+    }
+
+    @media (max-width: 600px) {
+      .container {
+        padding: 24px;
+      }
+
+      .header h1 {
+        font-size: 22px;
+      }
+
+      button {
+        padding: 10px 16px;
+        font-size: 13px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🔧 后端配置工具</h1>
+      <p>配置 AI 智能助手的后端服务器地址</p>
+    </div>
+
+    <div class="current-config">
+      <div class="current-config-title">📍 当前配置</div>
+      <div class="current-config-url" id="currentConfig">
+        <span style="color: #999;">未配置</span>
+      </div>
+    </div>
+
+    <div class="info-box">
+      💡 提示：输入完整的后端 URL（包括协议和端口），例如：<br>
+      <code>https://acid-focal-affair-adds.trycloudflare.com</code>
+    </div>
+
+    <form onsubmit="return false;">
+      <div class="form-group">
+        <label for="backendUrl">后端 URL</label>
+        <input 
+          type="text" 
+          id="backendUrl" 
+          placeholder="https://your-backend-url.com 或 http://localhost:8001"
+          autocomplete="off"
+        >
+      </div>
+
+      <div class="button-group">
+        <button type="button" class="btn-test" onclick="testConnection()">
+          🧪 测试连接
+        </button>
+        <button type="button" class="btn-save" onclick="saveConfig()">
+          💾 保存配置
+        </button>
+        <button type="button" class="btn-reset" onclick="resetConfig()">
+          🔄 重置
+        </button>
+      </div>
+
+      <div class="quick-buttons">
+        <button type="button" class="quick-btn" onclick="setUrl('https://acid-focal-affair-adds.trycloudflare.com')">
+          设置为 Tunnel
+        </button>
+        <button type="button" class="quick-btn" onclick="setUrl('http://localhost:8001')">
+          设置为本地
+        </button>
+      </div>
+    </form>
+
+    <div id="statusArea"></div>
+  </div>
+
+  <script>
+    const STATUS_STORAGE_KEY = 'BEIMS_API_BASE';
+
+    // 初始化
+    function init() {
+      const savedUrl = localStorage.getItem(STATUS_STORAGE_KEY);
+      if (savedUrl) {
+        document.getElementById('backendUrl').value = savedUrl;
+        updateCurrentConfig();
+      }
+    }
+
+    // 更新当前配置显示
+    function updateCurrentConfig() {
+      const savedUrl = localStorage.getItem(STATUS_STORAGE_KEY);
+      const configDiv = document.getElementById('currentConfig');
+      if (savedUrl) {
+        configDiv.textContent = savedUrl;
+        configDiv.style.color = '#333';
+      } else {
+        configDiv.innerHTML = '<span style="color: #999;">未配置</span>';
+      }
+    }
+
+    // 设置 URL
+    function setUrl(url) {
+      document.getElementById('backendUrl').value = url;
+    }
+
+    // 显示状态
+    function showStatus(message, type = 'info') {
+      const statusArea = document.getElementById('statusArea');
+      const statusBox = document.createElement('div');
+      statusBox.className = `status-box ${type}`;
+      
+      const statusLabel = {
+        'success': '✅ 成功',
+        'error': '❌ 错误',
+        'testing': '⏳ 测试中',
+        'info': 'ℹ️ 信息'
+      }[type] || '信息';
+
+      statusBox.innerHTML = `
+        <div class="status-label">${statusLabel}</div>
+        <div class="status-content">${message}</div>
+      `;
+      statusArea.innerHTML = '';
+      statusArea.appendChild(statusBox);
+      statusArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    // 测试连接
+    async function testConnection() {
+      const url = document.getElementById('backendUrl').value.trim();
+      
+      if (!url) {
+        showStatus('请输入后端 URL', 'error');
+        return;
+      }
+
+      showStatus('<span class="loading-spinner"></span>正在测试连接...', 'testing');
+      
+      try {
+        // 尝试连接 /health 端点
+        const testUrl = url.endsWith('/') ? url + 'health' : url + '/health';
+        
+        const response = await fetch(testUrl, {
+          method: 'GET',
+          mode: 'cors',
+          timeout: 5000
+        });
+
+        if (response.ok) {
+          showStatus(`✓ 连接成功！<br>
+            URL: ${url}<br>
+            状态码: ${response.status}`, 'success');
+        } else {
+          showStatus(`⚠ 服务器返回状态码 ${response.status}<br>
+            URL: ${url}`, 'error');
+        }
+      } catch (error) {
+        const errorMsg = error.message || '未知错误';
+        showStatus(`连接失败<br>
+          错误: ${errorMsg}<br>
+          URL: ${url}<br>
+          <br>
+          💡 可能的原因：<br>
+          • 后端服务未启动<br>
+          • URL 地址错误<br>
+          • 网络连接问题<br>
+          • CORS 跨域限制`, 'error');
+      }
+    }
+
+    // 保存配置
+    function saveConfig() {
+      const url = document.getElementById('backendUrl').value.trim();
+      
+      if (!url) {
+        showStatus('请输入后端 URL', 'error');
+        return;
+      }
+
+      try {
+        localStorage.setItem(STATUS_STORAGE_KEY, url);
+        updateCurrentConfig();
+        showStatus(`✓ 配置已保存<br>
+          URL: ${url}<br>
+          <br>
+          🔄 页面已更新，浮窗将使用此 URL`, 'success');
+      } catch (error) {
+        showStatus(`保存失败: ${error.message}`, 'error');
+      }
+    }
+
+    // 重置配置
+    function resetConfig() {
+      if (confirm('确定要清除已保存的配置吗？')) {
+        localStorage.removeItem(STATUS_STORAGE_KEY);
+        document.getElementById('backendUrl').value = '';
+        updateCurrentConfig();
+        showStatus('配置已清除，将恢复为默认设置', 'info');
+      }
+    }
+
+    // 页面加载时初始化
+    window.addEventListener('load', init);
+  </script>
+</body>
+</html>

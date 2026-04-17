@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.DS_Store
+.env
+node_modules/
+*.zip
+*.7z
+*.db
+*.pdf
+Fuwu.7z

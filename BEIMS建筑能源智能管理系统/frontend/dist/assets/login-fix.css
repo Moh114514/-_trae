@@ -1,0 +1,11 @@
+.login-form-wrapper {
+  transform: none !important;
+}
+
+.login-form-wrapper:hover {
+  transform: none !important;
+}
+
+.login-form-wrapper * {
+  transform: none !important;
+}

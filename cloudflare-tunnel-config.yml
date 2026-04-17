@@ -1,0 +1,58 @@
+# Cloudflare Tunnel 配置文件
+# 使用方法: cloudflared tunnel run --config-file cloudflare-tunnel.yml
+
+# 隧道名称（可自定义）
+tunnel: beims-tunnel
+
+# 隧道凭证路径（首次运行会自动生成）
+credentials-file: C:\Users\%USERNAME%\.cloudflared\beims-tunnel.json
+
+# 隧道连接信息
+connection:
+  # 最大并发连接数
+  num-workers: 10
+  
+  # 健康检查间隔（秒）
+  health-check-interval: 30s
+  
+  # TCP 保活间隔（秒）
+  tcp-keep-alive: 30s
+  
+  # 连接超时（秒）
+  connection-timeout: 30s
+
+# 日志配置
+logger:
+  level: info  # 日志级别: debug, info, warning, error
+  
+# 代理规则
+ingress:
+  # 前端规则
+  - hostname: terry-genre-dreams-seemed.trycloudflare.com
+    service: http://localhost:3000
+    originRequest:
+      noTLSVerify: false
+  
+  # 后端规则
+  - hostname: acid-focal-affair-adds.trycloudflare.com
+    service: http://localhost:8001
+    originRequest:
+      noTLSVerify: false
+  
+  # 通配符和默认规则
+  - service: http_status:404  # 其他请求返回 404
+
+# TLS 配置
+tls:
+  # 禁用 TLS 验证（仅用于开发，生产环境建议开启）
+  verify: false
+
+# 高级选项（可选）
+# 超时配置
+timeout: 30s
+
+# 连接池大小
+pool-connections: 10
+
+# 保留端口配置（可选）
+# keepalive-interval: 30s
