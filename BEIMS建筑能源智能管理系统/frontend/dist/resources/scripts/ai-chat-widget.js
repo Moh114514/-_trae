@@ -117,6 +117,8 @@
   var isProcessing = false;  // 全局处理锁（比 isLoading 更严格）
   var lastClickTime = 0;     // 上次点击时间戳
   var DEBOUNCE_DELAY = 800;  // 防抖延迟（毫秒）
+  var pendingResponse = null; // 等待展示的助手响应
+  var currentRequestId = 0;   // 请求序号，用于忽略过期响应
 
   // 创建样式
   function createStyles() {
@@ -400,48 +402,39 @@
 
   // 重置对话
   function resetChat() {
+    // 清空会话前先终止当前交互，避免残留异步状态
+    stopResponse({ silentNotice: true });
+
     var container = document.getElementById('ai-chat-messages');
     container.innerHTML = '<div class="message assistant"><div class="message-content">对话已清空。请问有什么可以帮您的？</div></div>';
   }
   
-  // 停止当前响应（截断模式：只保留已输出的部分）
-  function stopResponse() {
-    console.log('[AI Chat] Stop button clicked - truncating output');
-
-    // 🔥 防止重复调用（如果已经停止过就不再处理）
-    if (!currentTypewriter && !currentAbortController) {
-      console.log('[AI Chat] ⚠️ 已经停止过了，忽略重复点击');
-      return;
-    }
-
-    // 1. 取消正在进行的网络请求
-    if (currentAbortController) {
-      currentAbortController.abort();
-      currentAbortController = null;
-    }
-
-    // 2. 截断打字机效果（停止在当前位置，不显示剩余内容）
-    if (currentTypewriter) {
-      currentTypewriter.truncate();  // 这会触发 onComplete 回调 → 自动调用 addTruncationNotice()
-      currentTypewriter = null;     // 立即清空引用防止重复
-    } else {
-      // 如果没有打字机在运行（比如还在"思考"阶段），手动添加提示
-      addTruncationNotice();
-    }
-
-    // 3. 隐藏"正在思考"动画
-    hideTyping();
-
-    // 4. 隐藏停止按钮
-    hideStopButton();
-
-    // 5. ✅ 使用统一的状态恢复函数
-    resetAllStates();
-
-    console.log('[AI Chat] Output truncated, UI restored');
+  function isAbortLikeError(error) {
+    if (!error) return false;
+    return error.name === 'AbortError' || error.message === 'Request aborted';
   }
 
-  // 🔥 新增：统一禁用/启用所有输入元素
+  function shouldTryNextCandidate(error) {
+    if (!error) {
+      return false;
+    }
+
+    if (isAbortLikeError(error)) {
+      return false;
+    }
+
+    if (error.__httpStatus === 404 || error.__httpStatus === 502 || error.__httpStatus === 503 || error.__httpStatus === 504) {
+      return true;
+    }
+
+    if (error.name === 'TypeError') {
+      return true;
+    }
+
+    return typeof error.message === 'string' && /Failed to fetch|NetworkError|Load failed/i.test(error.message);
+  }
+
+  // 统一禁用/启用所有输入元素
   function disableAllInputs(disabled) {
     var input = document.getElementById('ai-chat-input');
     var sendBtn = document.getElementById('ai-chat-send');
@@ -450,29 +443,86 @@
     if (input) input.disabled = disabled;
     if (sendBtn) sendBtn.disabled = disabled;
 
-    // 同时禁用快捷问题按钮
     quickBtns.forEach(function(btn) {
       btn.disabled = disabled;
       btn.style.opacity = disabled ? '0.5' : '1';
       btn.style.cursor = disabled ? 'not-allowed' : 'pointer';
     });
-
-    console.log('[AI Chat] All inputs ' + (disabled ? 'disabled' : 'enabled'));
   }
 
-  // 🔥 新增：统一重置所有状态（唯一入口）
+  function addTruncationNotice() {
+    var container = document.getElementById('ai-chat-messages');
+    if (!container) return;
+
+    var notice = document.createElement('div');
+    notice.className = 'message assistant';
+    notice.innerHTML = '<div class="message-content truncation-notice">⏹️ 输出已停止</div>';
+    container.appendChild(notice);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function showStopButton() {
+    var stopBtn = document.getElementById('ai-chat-stop-btn');
+    if (stopBtn) {
+      stopBtn.classList.add('show');
+    }
+  }
+
+  function hideStopButton() {
+    var stopBtn = document.getElementById('ai-chat-stop-btn');
+    if (stopBtn) {
+      stopBtn.classList.remove('show');
+    }
+  }
+
+  // 统一重置所有状态（唯一入口）
   function resetAllStates() {
     isLoading = false;
-    isProcessing = false;  // 🔥 释放全局锁
-    lastClickTime = 0;      // 🔥 重置防抖计时器
+    isProcessing = false;
+    lastClickTime = 0;
 
-    // 恢复所有输入元素
+    pendingResponse = null;
+    currentAbortController = null;
+
     disableAllInputs(false);
-
-    // 隐藏停止按钮
     hideStopButton();
+  }
 
-    console.log('[AI Chat] ✅ All states reset (isLoading=' + isLoading + ', isProcessing=' + isProcessing + ')');
+  // 停止当前响应（截断模式：只保留已输出的部分）
+  function stopResponse(options) {
+    var opts = options || {};
+
+    // 更新请求序号，后续旧请求回调会自动失效
+    currentRequestId += 1;
+
+    var hasRequest = !!currentAbortController;
+    var hasTypewriter = !!currentTypewriter;
+    var hasPendingOutput = !!pendingResponse;
+
+    if (!hasRequest && !hasTypewriter && !hasPendingOutput) {
+      return;
+    }
+
+    if (currentAbortController) {
+      currentAbortController.abort();
+      currentAbortController = null;
+    }
+
+    hideTyping();
+
+    if (currentTypewriter) {
+      if (opts.silentNotice) {
+        currentTypewriter.cancel();
+      } else {
+        currentTypewriter.truncate();
+      }
+      return;
+    }
+
+    resetAllStates();
+    if (!opts.silentNotice) {
+      addTruncationNotice();
+    }
   }
 
   function buildReportUrlFromAction(action) {
@@ -528,128 +578,28 @@
     return true;
   }
   
-  // 添加截断提示消息
-  function addTruncationNotice() {
-    var container = document.getElementById('ai-chat-messages');
-    var notice = document.createElement('div');
-    notice.className = 'message assistant';
-    notice.innerHTML = '<div class="message-content truncation-notice">⏹️ 输出已停止</div>';
-    container.appendChild(notice);
-    container.scrollTop = container.scrollHeight;
-  }
-  
-  // 显示停止按钮
-  function showStopButton() {
-    var stopBtn = document.getElementById('ai-chat-stop-btn');
-    console.log('[AI Chat] Showing stop button, element:', stopBtn);
-    if (stopBtn) {
-      stopBtn.classList.add('show');
-      console.log('[AI Chat] Stop button should now be visible');
-    } else {
-      console.error('[AI Chat] Stop button element not found!');
-    }
-  }
-  
-  // 隐藏停止按钮
-  function hideStopButton() {
-    var stopBtn = document.getElementById('ai-chat-stop-btn');
-    if (stopBtn) {
-      stopBtn.classList.remove('show');
-    }
-  }
-
   // 发送快捷问题
   function sendQuick(text) {
     var input = document.getElementById('ai-chat-input');
+    if (!input) return;
+
     input.value = text;
     sendMessage();
   }
 
-  // 发送消息（🔥 增强版：带防抖和强制状态锁）
-  function sendMessage() {
-    var input = document.getElementById('ai-chat-input');
-    var text = input.value.trim();
-
-    // 🔒 第一重防护：空消息检查
-    if (!text) {
-      console.log('[AI Chat] Empty message, ignored');
-      return;
-    }
-
-    // 🔒 第二重防护：防抖检查（防止快速连续点击）
-    var now = Date.now();
-    if (now - lastClickTime < DEBOUNCE_DELAY) {
-      console.log('[AI Chat] Debounce: click too fast (' + (now - lastClickTime) + 'ms < ' + DEBOUNCE_DELAY + 'ms), ignored');
-      return;
-    }
-    lastClickTime = now;
-
-    // 🔒 第三重防护：全局处理锁（最严格的检查）
-    if (isProcessing || isLoading) {
-      console.log('[AI Chat] Already processing (isProcessing=' + isProcessing + ', isLoading=' + isLoading + '), ignored');
-      return;
-    }
-
-    // ✅ 通过所有检查，开始处理
-    isProcessing = true;  // 设置全局锁
-    isLoading = true;
-
-    console.log('[AI Chat] ✅ Message accepted: "' + text.substring(0, 30) + '..."');
-
-    addMessage('user', text, false);
-    input.value = '';
-
-    // 禁用所有交互元素（防止再次点击）
-    disableAllInputs(true);
-
-    // 显示停止按钮
-    showStopButton();
-
-    // 显示"正在思考"动画
-    showTyping();
-
-    // 创建 AbortController 用于取消请求
-    currentAbortController = new AbortController();
-
-    // 🔥 构建 API 候选地址（地址失效时自动回退）
+  function requestChatWithFallback(message, signal) {
     var chatUrlCandidates = getChatUrlCandidates();
-    console.log('[AI Chat] Chat URL candidates:', chatUrlCandidates);
 
-    function shouldTryNextCandidate(error) {
-      if (!error) {
-        return false;
-      }
-
-      if (error.name === 'AbortError' || error.message === 'Request aborted') {
-        return false;
-      }
-
-      if (error.__httpStatus === 404 || error.__httpStatus === 502 || error.__httpStatus === 503 || error.__httpStatus === 504) {
-        return true;
-      }
-
-      if (error.name === 'TypeError') {
-        return true;
-      }
-
-      return typeof error.message === 'string' && /Failed to fetch|NetworkError|Load failed/i.test(error.message);
-    }
-
-    function fetchWithFallback(index) {
+    function attempt(index) {
       var chatUrl = chatUrlCandidates[index];
-      console.log('🚀 Calling chat API:', chatUrl, '| candidate', (index + 1) + '/' + chatUrlCandidates.length);
 
       return fetch(chatUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text }),
-        signal: currentAbortController.signal
+        body: JSON.stringify({ message: message }),
+        signal: signal
       })
       .then(function(response) {
-        if (currentAbortController && currentAbortController.signal.aborted) {
-          throw new Error('Request aborted');
-        }
-
         if (!response.ok) {
           var httpError = new Error('HTTP ' + response.status + ' @ ' + chatUrl);
           httpError.__httpStatus = response.status;
@@ -661,104 +611,101 @@
       })
       .catch(function(error) {
         if (shouldTryNextCandidate(error) && index < chatUrlCandidates.length - 1) {
-          console.warn('[AI Chat] API 候选失败，尝试下一个:', chatUrl, error.message || error);
-          return fetchWithFallback(index + 1);
+          return attempt(index + 1);
         }
         throw error;
       });
     }
 
-    fetchWithFallback(0)
-    .then(function(data) {
-      // 检查是否被中止
-      if (currentAbortController && currentAbortController.signal.aborted) {
-        throw new Error('Request aborted');
-      }
+    return attempt(0);
+  }
 
-      // 检查是否被中止（在解析JSON后）
-      if (currentAbortController && currentAbortController.signal.aborted) {
-        throw new Error('Request aborted');
+  // 发送消息（重写版：请求生命周期清晰、状态单一入口）
+  function sendMessage() {
+    var input = document.getElementById('ai-chat-input');
+    if (!input) return;
+
+    var text = input.value.trim();
+
+    if (!text) {
+      return;
+    }
+
+    var now = Date.now();
+    if (now - lastClickTime < DEBOUNCE_DELAY) {
+      return;
+    }
+    lastClickTime = now;
+
+    if (isProcessing || isLoading) {
+      return;
+    }
+
+    isProcessing = true;
+    isLoading = true;
+    currentRequestId += 1;
+    var requestId = currentRequestId;
+
+    addMessage('user', text, false);
+    input.value = '';
+
+    disableAllInputs(true);
+    showStopButton();
+    showTyping();
+
+    currentAbortController = new AbortController();
+    pendingResponse = null;
+
+    requestChatWithFallback(text, currentAbortController.signal)
+    .then(function(data) {
+      if (requestId !== currentRequestId) {
+        return;
       }
 
       hideTyping();
 
-      currentAbortController = null;  // 请求已完成，清除AbortController
+      var responseText = data && typeof data.response === 'string' ? data.response : '';
+      if (!responseText) {
+        addMessage('assistant', '抱歉，我无法理解您的问题。', true);
+        resetAllStates();
+        return;
+      }
 
-      if (data.response) {
-        var uiAction = data && data.context && data.context.ui_action;
-        if (uiAction) {
-          pendingResponse = null;
-          currentTypewriter = null;
-          addMessage('assistant', data.response, false);
-          resetAllStates();
-          executeUIAction(uiAction);
+      var uiAction = data && data.context && data.context.ui_action;
+      if (uiAction) {
+        addMessage('assistant', responseText, false);
+        resetAllStates();
+        executeUIAction(uiAction);
+        return;
+      }
+
+      pendingResponse = responseText;
+      currentTypewriter = addMessageWithTypewriter(responseText, function(isTruncated) {
+        if (requestId !== currentRequestId) {
           return;
         }
 
-        // 检查是否为超长文本（数据查询结果）
-        var isLongText = data.response.length > 2000;
-
-        // 保存响应（用于跳过等待功能）
-        pendingResponse = data.response;
-
-        // 🔥 定义打字机完成回调（事件驱动，不依赖定时器）
-        function onTypewriterComplete(isTruncated) {
-          console.log('[AI Chat] ✅ Typewriter event received (truncated=' + isTruncated + ')');
-
-          // 清理资源
-          pendingResponse = null;
-          currentTypewriter = null;
-
-          // 如果是被截断的，添加提示
-          if (isTruncated) {
-            addTruncationNotice();
-          }
-
-          // ✅ 统一恢复所有状态（只在真正完成后执行！）
-          resetAllStates();
+        currentTypewriter = null;
+        if (isTruncated) {
+          addTruncationNotice();
         }
-
-        // 使用打字机效果显示并传入完成回调
-        currentTypewriter = addMessageWithTypewriter(data.response, onTypewriterComplete);
-
-        // 如果是超长文本，立即显示跳过按钮（不影响状态管理）
-        if (isLongText) {
-          setTimeout(function() {
-            var skipBtn = document.querySelector('.skip-wait-btn');
-            if (skipBtn) {
-              skipBtn.style.display = 'inline-block';
-              skipBtn.textContent = '查看完整数据 (' + Math.round(data.response.length / 1000) + 'K字符)';
-            }
-          }, 100);
-        }
-
-        // ⚠️ 注意：这里不再有 setTimeout 来强制重置状态！
-        // 状态重置完全依赖 onTypewriterComplete 回调
-        // 这样确保只有在打字机真正完成（或被停止）后才会恢复状态
-
-      } else {
-        addMessage('assistant', '抱歉，我无法理解您的问题。', true);
-        resetAllStates();  // 即使失败也要恢复状态
-      }
+        resetAllStates();
+      });
     })
     .catch(function(error) {
-      // 忽略中止错误
-      if (error.name === 'AbortError' || error.message === 'Request aborted') {
-        console.log('[AI Chat] Response stopped by user');
-        return;  // 注意：停止时不要调用 resetAllStates()，由 stopResponse() 处理
+      if (requestId !== currentRequestId) {
+        return;
+      }
+
+      if (isAbortLikeError(error)) {
+        return;
       }
 
       hideTyping();
-      hideStopButton();
-      isLoading = false;
-      isProcessing = false;  // 🔥 新增：释放全局锁
-      currentAbortController = null;
-
-      // 恢复输入框和发送按钮
-      disableAllInputs(false);
+      currentTypewriter = null;
 
       addMessage('assistant', '抱歉，服务暂时不可用，请稍后再试。', true);
-      console.error('Chat API Error:', error);
+      resetAllStates();
     });
   }
 
@@ -802,107 +749,96 @@
     return typeWriter(msg.querySelector('.message-content'), rendered, onComplete);
   }
   
-  // 打字机效果函数（🔥 增强版：基于事件驱动的状态管理）
+  // 打字机效果函数（重写版：可预测的完成/取消/截断语义）
   function typeWriter(element, htmlContent, onComplete) {
-    // 创建临时容器来解析 HTML
     var tempDiv = document.createElement('div');
     tempDiv.innerHTML = htmlContent;
-
-    // 提取纯文本内容（保留基本结构）
     var textContent = tempDiv.textContent || '';
 
-    // 🔥 关键修复：根据长度选择显示策略
-    var MAX_TYPING_LENGTH = 2000;  // 超过此长度直接显示
+    var MAX_TYPING_LENGTH = 2000;
+    var charIndex = 0;
+    var isStopped = false;
+    var isFinished = false;
+    var timerId = null;
+    var speed = textContent.length > 1000 ? 15 : (textContent.length > 500 ? 20 : 1);
 
-    if (textContent.length > MAX_TYPING_LENGTH) {
-      // 超长文本：直接显示 + 渐入动画（避免"死循环"）
-      element.style.opacity = '0';
-      element.style.transition = 'opacity 0.5s ease-in';
-      element.innerHTML = htmlContent;
+    function finalize(truncated, showFull) {
+      if (isFinished) {
+        return;
+      }
 
-      // 强制重排后触发动画
-      requestAnimationFrame(function() {
-        element.style.opacity = '1';
+      isFinished = true;
+      if (timerId) {
+        clearTimeout(timerId);
+        timerId = null;
+      }
 
-        console.log('[AI Chat] Long text displayed, calling onComplete callback');
+      if (showFull) {
+        element.innerHTML = htmlContent;
+      } else {
+        element.innerHTML = escapeHtml(textContent.substring(0, charIndex));
+      }
 
-        // ✅ 超长文本显示完成后调用回调
-        if (typeof onComplete === 'function') {
-          onComplete();
-        }
-      });
+      element.classList.remove('typing-cursor');
+      var container = document.getElementById('ai-chat-messages');
+      if (container) {
+        container.scrollTop = container.scrollHeight;
+      }
 
-      return { cancel: function() {}, skip: function() {} };
+      if (typeof onComplete === 'function') {
+        onComplete(!!truncated);
+      }
     }
 
-    // 正常/短文本：使用打字机效果
-    var charIndex = 0;
-    var isStopped = false;  // 截断标志
+    if (textContent.length > MAX_TYPING_LENGTH) {
+      element.style.opacity = '0';
+      element.style.transition = 'opacity 0.35s ease-in';
+      requestAnimationFrame(function() {
+        element.style.opacity = '1';
+        finalize(false, true);
+      });
 
-    // 计算速度（根据长度自适应）
-    var baseSpeed = 1; // 基础速度 ms/字
-    var speed = textContent.length > 1000 ? 15 : (textContent.length > 500 ? 20 : baseSpeed);
+      return {
+        cancel: function() { finalize(false, true); },
+        skip: function() { finalize(false, true); },
+        truncate: function() { finalize(true, false); }
+      };
+    }
 
-    // 打字机主函数
-    function type() {
-      // 检查是否被停止
+    function tick() {
       if (isStopped) {
-        console.log('[AI Chat] Typewriter stopped at char', charIndex, 'of', textContent.length);
-        element.classList.remove('typing-cursor');
-
-        // 🔥 即使停止也要调用回调（让上层知道打字机已结束）
-        if (typeof onComplete === 'function') {
-          onComplete(true);  // true 表示被截断
-        }
+        finalize(true, false);
         return;
       }
 
       if (charIndex < textContent.length) {
-        // 每次添加一个字符
-        element.innerHTML = escapeHtml(textContent.substring(0, charIndex + 1));
-        charIndex++;
-
-        // 自动滚动到底部
-        var container = document.getElementById('ai-chat-messages');
-        container.scrollTop = container.scrollHeight;
-
-        setTimeout(type, speed);
-      } else {
-        // ✅ 打字真正完成！
-        element.innerHTML = htmlContent;
-        element.classList.remove('typing-cursor');
+        charIndex += 1;
+        element.innerHTML = escapeHtml(textContent.substring(0, charIndex));
 
         var container = document.getElementById('ai-chat-messages');
-        container.scrollTop = container.scrollHeight;
-
-        console.log('[AI Chat] Typewriter naturally completed, calling onComplete callback');
-
-        // 🔥 只在真正完成时才调用回调
-        if (typeof onComplete === 'function') {
-          onComplete(false);  // false 表示正常完成
+        if (container) {
+          container.scrollTop = container.scrollHeight;
         }
+
+        timerId = setTimeout(tick, speed);
+      } else {
+        finalize(false, true);
       }
     }
 
-    // 开始打字
-    setTimeout(type, 100); // 短暂延迟后开始
+    timerId = setTimeout(tick, 100);
 
-    // 返回控制对象（可用于取消或截断）
     return {
       cancel: function() {
-        // 完整显示模式：立即显示全部内容
         charIndex = textContent.length;
-        element.innerHTML = htmlContent;
-        element.classList.remove('typing-cursor');
+        finalize(false, true);
       },
       skip: function() {
-        this.cancel();
+        charIndex = textContent.length;
+        finalize(false, true);
       },
       truncate: function() {
-        // 截断模式：停止在当前位置，只保留已输出的部分
-        console.log('[AI Chat] truncate() called, current position:', charIndex);
-        isStopped = true;  // 设置停止标志
-        element.classList.remove('typing-cursor');  // 移除光标
+        isStopped = true;
       }
     };
   }
@@ -970,13 +906,21 @@
     container.scrollTop = container.scrollHeight;
   }
   
-  // 跳过等待（立即显示结果）
-  var pendingResponse = null;
+  // 跳过等待（请求中=停止请求；输出中=完整展示）
   function skipWaiting() {
+    if (isLoading && currentAbortController) {
+      stopResponse({ silentNotice: true });
+      return;
+    }
+
+    if (currentTypewriter) {
+      currentTypewriter.cancel();
+      return;
+    }
+
     if (pendingResponse) {
-      hideTyping();
-      addMessage('assistant', pendingResponse, false); // 禁用打字机，直接显示
-      pendingResponse = null;
+      addMessage('assistant', pendingResponse, false);
+      resetAllStates();
     }
   }
 
