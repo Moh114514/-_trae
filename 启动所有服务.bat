@@ -8,13 +8,14 @@ color 0A
 echo.
 echo ╔════════════════════════════════════════════════════════════╗
 echo ║  🚀 BEIMS 建筑能源智能管理系统                           ║
-echo ║     完整启动工具 - 后端 + 前端(生产模式)                ║
+echo ║     完整启动工具 - 后端 + 前端 + API v2                 ║
 echo ╚════════════════════════════════════════════════════════════╝
 echo.
 
 set "ROOT_DIR=%~dp0"
 set "BACKEND_DIR=%ROOT_DIR%BEIMS建筑能源智能管理系统\backend"
 set "FRONTEND_DIR=%ROOT_DIR%BEIMS建筑能源智能管理系统\frontend"
+set "API_SERVER_PATH=%ROOT_DIR%api_server.py"
 set "VENV_PYTHON=%ROOT_DIR%.venv\Scripts\python.exe"
 
 echo 📍 项目根目录: %ROOT_DIR%
@@ -45,6 +46,21 @@ timeout /t 3 /nobreak >nul
 echo ✅ 前端启动命令已执行
 echo.
 
+REM ========== 启动 API v2 ==========
+echo 【3】启动 API v2 服务 (port 8082)...
+cd /d "%ROOT_DIR%"
+if not exist "%API_SERVER_PATH%" (
+    echo ❌ 未找到 API 文件!
+    echo    预期路径: %API_SERVER_PATH%
+    pause
+    exit /b 1
+)
+start "BEIMS API v2" cmd /c "title BEIMS API v2 Service && "%VENV_PYTHON%" "%API_SERVER_PATH%" && pause"
+echo ⏳ API v2 启动中...
+timeout /t 3 /nobreak >nul
+echo ✅ API v2 启动命令已执行
+echo.
+
 REM ========== 提示信息 ==========
 echo ════════════════════════════════════════════════════════════
 echo ✅ 所有服务启动完成！
@@ -53,11 +69,14 @@ echo.
 echo 📊 服务地址:
 echo   • 后端 API:   http://localhost:8001
 echo   • 前端页面:   http://localhost:3000
+echo   • API v2:     http://localhost:8082
+echo   • API v2 文档: http://localhost:8082/docs
 echo   • 健康检查:   http://localhost:8001/health
 echo.
 echo 📝 调试窗口:
 echo   • 后端窗口:   BEIMS Backend Service (自动打开)
 echo   • 前端窗口:   BEIMS Frontend Service (自动打开)
+echo   • API v2窗口: BEIMS API v2 Service (自动打开)
 echo.
 echo 🌐 下一步 - 启动内网穿透:
 echo   1. 打开新的 PowerShell
