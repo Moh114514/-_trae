@@ -253,9 +253,124 @@ BEIMS建筑能源智能管理系统/
 - 性能优化：优先使用规则引擎处理简单查询，复杂查询交给LLM
 - 可扩展性：支持自定义规则和意图模板
 
-## 5. 智能助手问答示例
+## 5. 智能助手安装依赖和部署
 
-### 5.1 数据查询类
+### 5.1 依赖要求
+
+**Python 依赖**：
+- **fastapi**：Web框架，用于构建API接口
+- **uvicorn**：ASGI服务器，用于运行FastAPI应用
+- **pydantic**：数据验证库
+- **requests**：HTTP客户端，用于调用Ollama和云端LLM API
+- **chromadb**：向量数据库，用于知识库检索
+- **psycopg2**：PostgreSQL数据库驱动
+- **sentence-transformers**：用于语义路由的嵌入模型
+- **numpy**：用于向量计算
+
+**外部服务依赖**：
+- **Ollama**：本地LLM服务
+  - 安装：访问 [Ollama官网](https://ollama.com) 下载并安装
+  - 模型：运行 `ollama pull qwen2.5:7b` 下载模型
+  - 启动：`ollama serve`
+- **PostgreSQL**：关系型数据库（推荐）
+  - 版本：12+
+  - 数据库：`building_energy`
+- **可选**：云端LLM服务（通义千问）
+  - 需要API密钥
+
+### 5.2 环境变量配置
+
+智能助手服务的配置主要在 `api_server.py` 文件中设置：
+
+| 配置项 | 说明 | 默认值 |
+|--------|------|--------|
+| DB_CONFIG | 数据库连接配置 | localhost:5432, building_energy |
+| OLLAMA_URL | Ollama API地址 | http://localhost:11434/api/generate |
+| LOCAL_MODEL | 本地模型名称 | qwen2.5:7b |
+| CLOUD_API_KEY | 云端LLM API密钥 | sk-a803c04cb57c40daa7f7aede38bb3469 |
+| CLOUD_API_URL | 云端LLM API地址 | https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions |
+| CLOUD_MODEL | 云端模型名称 | qwen-plus |
+| CHROMA_PATH | 向量数据库路径 | E:\openclaw-project\workspace\Fuwu\chroma_db |
+
+### 5.3 部署步骤
+
+#### 5.3.1 安装依赖
+
+```bash
+# 安装Python依赖
+pip install fastapi uvicorn pydantic requests chromadb psycopg2-binary sentence-transformers numpy
+
+# 安装Ollama（参考Ollama官网）
+# 下载并安装qwen2.5:7b模型
+ollama pull qwen2.5:7b
+
+# 启动Ollama服务
+ollama serve
+```
+
+#### 5.3.2 数据库配置
+
+**PostgreSQL**：
+1. 安装PostgreSQL（参考官方文档）
+2. 创建数据库：
+   ```sql
+   CREATE DATABASE building_energy;
+   ```
+3. 更新 `api_server.py` 中的 `DB_CONFIG` 配置
+
+**SQLite**（可选，仅用于测试）：
+- 无需额外配置，系统会自动创建
+
+#### 5.3.3 启动智能助手服务
+
+**方法1：使用启动脚本**
+- 双击运行 [启动所有服务.bat](file:///workspace/BEIMS建筑能源智能管理系统/启动所有服务.bat)
+- 脚本会自动启动智能助手服务
+
+**方法2：手动启动**
+```bash
+# 在项目根目录运行
+python api_server.py
+```
+
+**方法3：使用uvicorn**
+```bash
+# 在项目根目录运行
+uvicorn api_server:app --host 0.0.0.0 --port 8082
+```
+
+### 5.4 服务验证
+
+启动后，访问以下地址验证服务是否正常运行：
+- **服务状态**：http://localhost:8082
+- **API文档**：http://localhost:8082/docs
+- **智能助手接口**：POST http://localhost:8082/chat
+
+### 5.5 常见问题
+
+**1. Ollama服务未启动**
+- 错误信息：`[错误] 本地模型未启动，请运行 ollama serve`
+- 解决方案：启动Ollama服务，确保 `ollama serve` 正在运行
+
+**2. 模型未下载**
+- 错误信息：`[错误] 模型 qwen2.5:7b 未找到`
+- 解决方案：运行 `ollama pull qwen2.5:7b` 下载模型
+
+**3. 数据库连接失败**
+- 错误信息：`SQL 错误：...`
+- 解决方案：检查PostgreSQL服务是否运行，数据库是否创建，连接配置是否正确
+
+**4. 端口被占用**
+- 错误信息：`Address already in use`
+- 解决方案：检查8082端口是否被占用，可修改端口号
+
+**5. 云端LLM调用失败**
+- 错误信息：`[云端模型] 调用失败：...`
+- 解决方案：检查API密钥是否正确，网络连接是否正常，云端服务是否可用
+
+## 6. 智能助手问答示例
+
+### 6.1 数据查询类
 
 **示例1：基本数据查询**
 - **用户**：Caspian 2021年7月21日的电耗是多少？
@@ -412,9 +527,9 @@ BEIMS建筑能源智能管理系统/
   
   实施这些措施后，预计可降低能耗 15-20%。
 
-## 6. 安装部署
+## 7. 安装部署
 
-### 6.1 一键启动（推荐）
+### 7.1 一键启动（推荐）
 
 1. 进入 `BEIMS建筑能源智能管理系统` 目录
 2. 双击运行 `start.bat` 脚本
@@ -472,9 +587,9 @@ BEIMS建筑能源智能管理系统/
    DATABASE_URL=postgresql://postgres:你的密码@localhost:5432/building_energy
    ```
 
-## 7. 系统配置
+## 8. 系统配置
 
-### 7.1 环境变量配置
+### 8.1 环境变量配置
 
 主要配置文件：`backend/.env`
 
@@ -524,17 +639,17 @@ BEIMS建筑能源智能管理系统/
 - 前端服务端口：3000
 - API代理配置：将 `/api` 转发到 `http://localhost:8001`
 
-## 8. 功能模块使用指南
+## 9. 功能模块使用指南
 
-### 8.1 数据导入
+### 9.1 数据导入
 
-#### 8.1.1 通过前端界面导入
+#### 9.1.1 通过前端界面导入
 1. 登录系统后，点击左侧菜单的"数据管理" → "数据导入"
 2. 点击"选择文件"按钮，上传 CSV 或 Excel 文件
 3. 点击"开始导入"按钮
 4. 等待导入完成，查看导入结果
 
-#### 8.1.2 通过 API 导入
+#### 9.1.2 通过 API 导入
 
 ```bash
 curl -X POST "http://localhost:8001/api/data/import/csv" \
@@ -542,7 +657,7 @@ curl -X POST "http://localhost:8001/api/data/import/csv" \
   -F "file=@Dataset/SHIFDR_Structured_Energy_Dataset.csv"
 ```
 
-### 8.2 数据查询
+### 9.2 数据查询
 
 1. 点击左侧菜单的"数据管理" → "数据查询"
 2. 设置查询条件：
@@ -553,7 +668,7 @@ curl -X POST "http://localhost:8001/api/data/import/csv" \
 4. 查看查询结果表格
 5. 可选择导出数据
 
-### 8.3 统计分析
+### 9.3 统计分析
 
 系统提供13类核心统计分析功能：
 
@@ -578,7 +693,7 @@ curl -X POST "http://localhost:8001/api/data/import/csv" \
 4. 查看分析结果和图表
 5. 可选择导出分析报告
 
-### 8.4 智能问答
+### 9.4 智能问答
 
 #### 网页版智能问答
 
@@ -641,13 +756,13 @@ BEIMS采用双架构智能问答系统：
    - 使用 `api_server.py` 启动：`python api_server.py`
    - 服务启动后可访问：http://localhost:8082/docs
 
-### 8.5 知识库管理
+### 9.5 知识库管理
 
 1. 点击左侧菜单的"知识库管理"
 2. 查看数据字典、设备手册等内容
 3. 可上传自定义文档到知识库
 
-### 8.6 报表导出
+### 9.6 报表导出
 
 1. 点击左侧菜单的"报表导出"
 2. 设置报表时间范围
@@ -655,9 +770,9 @@ BEIMS采用双架构智能问答系统：
 4. 点击"生成报表"按钮
 5. 下载生成的PDF报表
 
-## 9. 常见问题排查
+## 10. 常见问题排查
 
-### 9.1 端口被占用
+### 10.1 端口被占用
 
 ```powershell
 # 查看 8001 端口
@@ -738,13 +853,13 @@ npm install
 - 检查服务器资源使用情况
 - 优化数据库查询（为常用字段创建索引）
 
-## 10. API文档
+## 11. API文档
 
 启动后端服务后访问：
 - Swagger UI: http://localhost:8001/docs
 - ReDoc: http://localhost:8001/redoc
 
-### 10.1 主要API端点
+### 11.1 主要API端点
 
 | 端点 | 方法 | 功能 |
 |------|------|------|
@@ -757,7 +872,7 @@ npm install
 | /api/auth/login | POST | 用户登录 |
 | /api/auth/register | POST | 用户注册 |
 
-### 10.2 MCP协议支持
+### 11.2 MCP协议支持
 
 系统支持MCP协议，可通过以下接口调用：
 
@@ -780,9 +895,9 @@ curl -X POST http://localhost:8001/api/mcp/call-tool \
   }'
 ```
 
-## 11. 维护与管理
+## 12. 维护与管理
 
-### 11.1 数据备份
+### 12.1 数据备份
 
 **SQLite**：
 - 直接复制 `beims.db` 文件
@@ -866,9 +981,9 @@ pg_restore -U postgres -d building_energy backup.dump
    - 通过智能问答界面提问
    - 系统会自动检索知识库并生成回答
 
-## 12. 故障处理
+## 13. 故障处理
 
-### 12.1 系统无法启动
+### 13.1 系统无法启动
 
 **可能原因**：
 - 端口被占用
@@ -924,24 +1039,24 @@ pg_restore -U postgres -d building_energy backup.dump
 - 检查网络连接
 - 初始化知识库
 
-## 13. 联系方式
+## 14. 联系方式
 
 如有任何问题或建议，请联系系统管理员或开发团队。
 
-### 13.1 技术支持
+### 14.1 技术支持
 
 - **系统管理员**：负责系统维护和故障处理
 - **开发团队**：负责功能开发和技术问题解决
 - **文档支持**：参考项目中的技术文档和测试用例
 
-### 13.2 相关文档
+### 14.2 相关文档
 
 - [README.md](file:///workspace/BEIMS建筑能源智能管理系统/README.md) - 项目说明
 - [OPERATIONS_BASELINE.md](file:///workspace/BEIMS建筑能源智能管理系统/OPERATIONS_BASELINE.md) - 运行基线
 - [PROJECT_PROGRESS.md](file:///workspace/PROJECT_PROGRESS.md) - 项目进度报告
 - [TECHNICAL_REPORT.md](file:///workspace/TECHNICAL_REPORT.md) - 技术报告
 
-## 14. 版本历史
+## 15. 版本历史
 
 | 版本 | 发布日期 | 主要变更 |
 |------|---------|---------|
