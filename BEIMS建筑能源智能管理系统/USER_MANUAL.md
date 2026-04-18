@@ -314,6 +314,20 @@ BEIMS建筑能源智能管理系统/
 
 #### 5.3.1 安装依赖
 
+**方法1：使用项目根目录的requirements.txt（推荐）**
+```bash
+# 在项目根目录运行
+pip install -r requirements.txt
+
+# 安装Ollama（参考Ollama官网）
+# 下载并安装qwen2.5:7b模型
+ollama pull qwen2.5:7b
+
+# 启动Ollama服务
+ollama serve
+```
+
+**方法2：手动安装**
 ```bash
 # 安装Python依赖
 pip install fastapi uvicorn pydantic requests chromadb psycopg2-binary sentence-transformers numpy

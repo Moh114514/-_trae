@@ -1,0 +1,26 @@
+# 智能助手和知识库模块依赖
+
+# Web框架和服务器
+fastapi==0.110.0
+uvicorn==0.29.0
+
+# 数据验证
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# HTTP客户端
+requests==2.31.0
+
+# 向量数据库
+chromadb==1.5.0
+
+# 数据库驱动
+psycopg2-binary==2.9.9
+
+# 嵌入模型和向量计算
+sentence-transformers==2.5.1
+numpy==1.26.4
+
+# 其他依赖
+python-dotenv==1.0.0
+python-multipart==0.0.6
