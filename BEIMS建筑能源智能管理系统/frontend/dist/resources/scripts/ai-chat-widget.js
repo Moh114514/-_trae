@@ -1007,6 +1007,61 @@
            document.title.toLowerCase().indexOf('login') !== -1 || document.title.indexOf('登录') !== -1;
   }
 
+  var visibilityUpdateTimer = null;
+
+  function scheduleVisibilityUpdate(delay) {
+    var wait = typeof delay === 'number' ? delay : 0;
+    if (visibilityUpdateTimer) {
+      clearTimeout(visibilityUpdateTimer);
+    }
+    visibilityUpdateTimer = setTimeout(function() {
+      visibilityUpdateTimer = null;
+      updateVisibility();
+    }, wait);
+  }
+
+  function setupVisibilityObservers() {
+    var originalPushState = history.pushState;
+    history.pushState = function() {
+      var result = originalPushState.apply(this, arguments);
+      scheduleVisibilityUpdate(30);
+      return result;
+    };
+
+    var originalReplaceState = history.replaceState;
+    history.replaceState = function() {
+      var result = originalReplaceState.apply(this, arguments);
+      scheduleVisibilityUpdate(30);
+      return result;
+    };
+
+    window.addEventListener('popstate', function() {
+      scheduleVisibilityUpdate(30);
+    });
+
+    window.addEventListener('hashchange', function() {
+      scheduleVisibilityUpdate(30);
+    });
+
+    window.addEventListener('focus', function() {
+      scheduleVisibilityUpdate(0);
+    });
+
+    document.addEventListener('visibilitychange', function() {
+      if (!document.hidden) {
+        scheduleVisibilityUpdate(0);
+      }
+    });
+
+    var titleEl = document.querySelector('title');
+    if (titleEl && typeof MutationObserver !== 'undefined') {
+      var titleObserver = new MutationObserver(function() {
+        scheduleVisibilityUpdate(0);
+      });
+      titleObserver.observe(titleEl, { childList: true, subtree: true, characterData: true });
+    }
+  }
+
   // 显示/隐藏浮窗
   function updateVisibility() {
     var btn = document.getElementById('ai-chat-float-btn');
@@ -1047,13 +1102,15 @@
     createFloatButton();
     createChatWindow();
     updateVisibility();
+    setupVisibilityObservers();
     setupClickOutsideListener();  // 🔥 添加外部点击监听
     var mainFrame = document.getElementById('mainFrame');
     if (mainFrame) {
       mainFrame.addEventListener('load', function() {
-        setTimeout(updateVisibility, 100);
+        scheduleVisibilityUpdate(100);
       });
     }
+    setTimeout(function() { scheduleVisibilityUpdate(0); }, 150);
     console.log('[AI Chat] 浮窗已加载 (v2.4-event-driven-state-management)');
   }
 
